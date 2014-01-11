@@ -4,13 +4,14 @@ import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.selenium._
 import org.openqa.selenium._
+import org.scalacheck.Gen
 
 class PlaySpec extends FunSpec with ShouldMatchers with WebBrowser with HtmlUnit with PropertyChecks {
 
   it("Can run javascript") {
     go to "file://garbage.html"
 
-    forAll{ s:String =>
+    forAll(Gen.alphaStr){ s:String =>
       whenever (s.length > 0) {
 
         val result = executeScript(s"return '$s';")
