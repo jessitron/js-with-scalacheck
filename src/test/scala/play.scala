@@ -11,7 +11,7 @@ class PlaySpec extends FunSpec with ShouldMatchers with WebBrowser with HtmlUnit
     go to "file://garbage.html"
 
     forAll{ s:String =>
-      whenever (s.length > 0) {
+      whenever (s.length > 0 && !s.contains("'") && !s.endsWith("\\")) {
 
         val result = executeScript(s"return '$s';")
 
