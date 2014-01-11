@@ -8,7 +8,7 @@ import org.scalacheck._
 import spray.json._
 import DefaultJsonProtocol._
 
-class SummarizeObjectsSpec extends FunSpec with ShouldMatchers with WebBrowser with Chrome with PropertyChecks {
+class SummarizeObjectsSpec extends FunSpec with ShouldMatchers with WebBrowser with HtmlUnit with PropertyChecks {
   /*
    * Say I have an array of objects like
    * { "source": "pid 1234",
@@ -43,7 +43,19 @@ class SummarizeObjectsSpec extends FunSpec with ShouldMatchers with WebBrowser w
   // Now use those in a test
   it("Can use the JS to summarize the details") {
 
-    go to "file://nowhere.html"
+    def urlses(cl: ClassLoader): Array[java.net.URL] = cl match {
+      case null => Array()
+      case u: java.net.URLClassLoader => u.getURLs() ++ urlses(cl.getParent)
+      case _ => urlses(cl.getParent)
+    }
+
+    val  urls = urlses(getClass.getClassLoader)
+    info(urls.filterNot(_.toString.contains("ivy")).mkString("\n"))
+    val url = getClass.getClassLoader.getResource("underscore.js")
+    //val url = getClass.getResource("page_with_underscore.html")
+    assert(url != null)
+
+    go to url.toString
 
     forAll(detailSeqs) { input: Seq[Detail] =>
 
@@ -72,9 +84,9 @@ class SummarizeObjectsSpec extends FunSpec with ShouldMatchers with WebBrowser w
   // todo: load from classpath?
   val jsonUnderTest = """
      function summarize(arr) {
-       var messages = arr.map(function(x) { return x.message; });
+       var messages = _.map(arr,function(x) { return x.message; });
 
-       var goCount = arr.filter(function(x) { return x === 'Go'}).length;
+       var goCount = _.filter(arr,function(x) { return x === 'Go'}).length;
 
        return {
          'goCount': goCount
