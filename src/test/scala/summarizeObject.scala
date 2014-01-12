@@ -43,19 +43,16 @@ class SummarizeObjectsSpec extends FunSpec with ShouldMatchers with WebBrowser w
   // Now use those in a test
   it("Can use the JS to summarize the details") {
 
-    def urlses(cl: ClassLoader): Array[java.net.URL] = cl match {
-      case null => Array()
-      case u: java.net.URLClassLoader => u.getURLs() ++ urlses(cl.getParent)
-      case _ => urlses(cl.getParent)
-    }
-
-    val  urls = urlses(getClass.getClassLoader)
-    info(urls.filterNot(_.toString.contains("ivy")).mkString("\n"))
     val url = getClass.getClassLoader.getResource("underscore.js")
     //val url = getClass.getResource("page_with_underscore.html")
     assert(url != null)
+    val s = scala.io.Source.fromURL(url)
+    val lines = s.getLines.mkString("\n")
+    s.close()
 
-    go to url.toString
+    go to "file://garbage.html"
+
+    executeScript(lines)
 
     forAll(detailSeqs) { input: Seq[Detail] =>
 
@@ -64,32 +61,31 @@ class SummarizeObjectsSpec extends FunSpec with ShouldMatchers with WebBrowser w
       val fullScript = jsonUnderTest + s"\n return summarize($inputJson);"
       info(fullScript)
 
-      val result: Summary  = executeScript(fullScript) match {
-        case s: String => s.asJson.convertTo[Summary]
-        case x => fail("What is this? " + x)
+      import scala.collection.JavaConversions._
+      val result: scala.collection.mutable.Map[String, AnyRef]  = executeScript(fullScript) match {
+        case h: java.util.HashMap[_,_] => h.asInstanceOf[java.util.HashMap[String,AnyRef]]
+        case x => fail("What is this? " + x + " of class " + x.getClass)
       }
+      info("Result : "+result)
 
       val goCount = input.map(_.message).filter(_ == "Go").size
 
-      result.goCount should be (goCount)
+      result("goCount") should be (goCount)
     }
   }
 
-  case class Summary(goCount: Int)
-  object Summary {
-    import DefaultJsonProtocol._
-    implicit val format: JsonFormat[Summary] = jsonFormat1(apply)
-  }
 
   // todo: load from classpath?
   val jsonUnderTest = """
      function summarize(arr) {
        var messages = _.map(arr,function(x) { return x.message; });
 
-       var goCount = _.filter(arr,function(x) { return x === 'Go'}).length;
-
+       var goMessages = _.filter(messages, function(x) { return x == 'Go';});
+       var goCount = goMessages.length;
        return {
-         'goCount': goCount
+         'goCount': goCount,
+         'messages': messages,
+         'goMessages': goMessages
        };
      }
   """
