@@ -36,7 +36,7 @@ class SummarizeObjectsSpec extends FunSpec with ShouldMatchers with WebBrowser w
   } yield Detail(s,m,t)
 
   val detailSeqs:Gen[Seq[Detail]] = for {
-    n <- Gen.choose(0, 20)
+    n <- Gen.choose(1, 20) // empty array is not supported
     l <- Gen.listOfN(n, details)
   } yield l
 
@@ -59,18 +59,21 @@ class SummarizeObjectsSpec extends FunSpec with ShouldMatchers with WebBrowser w
       val inputJson = input.toJson.prettyPrint
 
       val fullScript = jsonUnderTest + s"\n return summarize($inputJson);"
-      info(fullScript)
 
       import scala.collection.JavaConversions._
       val result: scala.collection.mutable.Map[String, AnyRef]  = executeScript(fullScript) match {
         case h: java.util.HashMap[_,_] => h.asInstanceOf[java.util.HashMap[String,AnyRef]]
         case x => fail("What is this? " + x + " of class " + x.getClass)
       }
-      info("Result : "+result)
+      //info("Result : "+result)
 
       val goCount = input.map(_.message).filter(_ == "Go").size
+      val minTime = input.map(_.timestamp).min
+      val maxTime = input.map(_.timestamp).max
 
       result("goCount") should be (goCount)
+      result("minTimestamp") should be (minTime)
+      result("maxTimestamp") should be (maxTime)
     }
   }
 
@@ -79,13 +82,17 @@ class SummarizeObjectsSpec extends FunSpec with ShouldMatchers with WebBrowser w
   val jsonUnderTest = """
      function summarize(arr) {
        var messages = _.map(arr,function(x) { return x.message; });
-
        var goMessages = _.filter(messages, function(x) { return x == 'Go';});
        var goCount = goMessages.length;
+
+       var timestamps = _.map(arr, function(x) { return x.timestamp;});
+       var max = _.max(timestamps);
+       var min = _.min(timestamps);
+
        return {
          'goCount': goCount,
-         'messages': messages,
-         'goMessages': goMessages
+         'minTimestamp': min,
+         'maxTimestamp': max
        };
      }
   """
